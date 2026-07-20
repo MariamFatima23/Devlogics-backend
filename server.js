@@ -11,14 +11,18 @@ app.use(cors({
   origin: [
     'http://localhost:3000',
     'http://localhost:3001',
+    'http://localhost:5173',
     process.env.FRONTEND_URL,
+    /\.vercel\.app$/,   // allow all vercel.app subdomains
   ].filter(Boolean),
   credentials: true,
 }))
 app.use(express.json())
 
-// Serve uploaded files statically
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Serve uploaded files statically (only in local development)
+if (!process.env.VERCEL) {
+  app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+}
 
 // Routes
 app.use('/api/auth',          require('./routes/auth.routes'))
@@ -78,6 +82,11 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log('✅ MongoDB connected');
-    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+    // Only listen on port when running locally (not on Vercel)
+    if (process.env.NODE_ENV !== 'production') {
+      app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+    }
   })
   .catch((err) => console.error('❌ MongoDB error:', err));
+
+module.exports = app;
