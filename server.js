@@ -62,18 +62,27 @@ app.get('/api/debug-env', (req, res) => {
   });
 });
 
-// MongoDB connection helper (cached for Vercel serverless)
-let isConnected = false;
-
+// MongoDB connection helper (safe for Vercel serverless)
 async function connectDB() {
-  if (isConnected) return;
+  // Already connected and connection is alive
+  if (mongoose.connection.readyState === 1) return;
+
+  // If connecting, wait for it
+  if (mongoose.connection.readyState === 2) {
+    await new Promise((resolve, reject) => {
+      mongoose.connection.once('connected', resolve);
+      mongoose.connection.once('error', reject);
+    });
+    return;
+  }
+
+  // Disconnected or never connected — reconnect
   await mongoose.connect(process.env.MONGO_URI, {
-    serverSelectionTimeoutMS: 10000,
+    serverSelectionTimeoutMS: 15000,
     socketTimeoutMS: 45000,
-    connectTimeoutMS: 10000,
-    maxPoolSize: 10,
+    connectTimeoutMS: 15000,
+    maxPoolSize: 5,
   });
-  isConnected = true;
   console.log('✅ MongoDB connected');
 }
 
@@ -83,8 +92,8 @@ app.use(async (req, res, next) => {
     await connectDB();
     next();
   } catch (err) {
-    console.error('❌ MongoDB connection error:', err);
-    res.status(500).json({ message: 'Database connection failed' });
+    console.error('❌ MongoDB connection error:', err.message);
+    res.status(500).json({ message: 'Database connection failed', detail: err.message });
   }
 });
 
