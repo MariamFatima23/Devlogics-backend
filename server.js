@@ -52,6 +52,16 @@ app.use('/api/contact',             require('./routes/contact.routes'))
 // Health check
 app.get('/', (req, res) => res.json({ message: 'University E-Portal API running' }));
 
+// Debug env (remove after fixing)
+app.get('/api/debug-env', (req, res) => {
+  res.json({
+    MONGO_URI_exists: !!process.env.MONGO_URI,
+    MONGO_URI_start: process.env.MONGO_URI ? process.env.MONGO_URI.substring(0, 30) : 'NOT SET',
+    JWT_SECRET_exists: !!process.env.JWT_SECRET,
+    NODE_ENV: process.env.NODE_ENV,
+  });
+});
+
 // MongoDB connection helper (cached for Vercel serverless)
 let isConnected = false;
 
