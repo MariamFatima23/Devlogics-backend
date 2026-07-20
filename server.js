@@ -52,23 +52,39 @@ app.use('/api/contact',             require('./routes/contact.routes'))
 // Health check
 app.get('/', (req, res) => res.json({ message: 'University E-Portal API running' }));
 
-// Connect to MongoDB and start server
-const PORT = process.env.PORT || 5000;
+// MongoDB connection helper (cached for Vercel serverless)
+let isConnected = false;
 
-mongoose
-  .connect(process.env.MONGO_URI, {
+async function connectDB() {
+  if (isConnected) return;
+  await mongoose.connect(process.env.MONGO_URI, {
     serverSelectionTimeoutMS: 10000,
     socketTimeoutMS: 45000,
     connectTimeoutMS: 10000,
     maxPoolSize: 10,
-    bufferCommands: false,
-  })
-  .then(() => {
-    console.log('✅ MongoDB connected');
-    if (process.env.NODE_ENV !== 'production') {
-      app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-    }
-  })
-  .catch((err) => console.error('❌ MongoDB error:', err));
+  });
+  isConnected = true;
+  console.log('✅ MongoDB connected');
+}
+
+// Middleware to ensure DB is connected before handling requests
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('❌ MongoDB connection error:', err);
+    res.status(500).json({ message: 'Database connection failed' });
+  }
+});
+
+// Connect to MongoDB and start server (local dev)
+const PORT = process.env.PORT || 5000;
+
+if (process.env.NODE_ENV !== 'production') {
+  connectDB().then(() => {
+    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+  }).catch((err) => console.error('❌ MongoDB error:', err));
+}
 
 module.exports = app;
