@@ -7,11 +7,17 @@ require('dotenv').config();
 const app = express();
 
 // Middleware
+const allowedOrigins = [
+  'https://devlogics-frontend.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5173',
+]
+
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow all vercel.app domains + localhost
     if (!origin) return callback(null, true)
     if (
+      allowedOrigins.includes(origin) ||
       origin.includes('vercel.app') ||
       origin.includes('localhost')
     ) {
