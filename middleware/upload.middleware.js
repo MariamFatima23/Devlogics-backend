@@ -1,6 +1,6 @@
 const multer = require('multer');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const fs = require('fs');
 
 // Use memory storage on Vercel (serverless), disk storage locally
@@ -16,7 +16,7 @@ const storage = isVercel
       },
       filename: (req, file, cb) => {
         const ext = path.extname(file.originalname);
-        cb(null, `${uuidv4()}${ext}`);
+        cb(null, `${crypto.randomUUID()}${ext}`);
       },
     });
 
