@@ -137,14 +137,17 @@ const updateProfile = async (req, res) => {
 
     // Profile image
     if (req.files?.profileImage?.[0]) {
-      updateData.profileImage = req.files.profileImage[0].filename;
+      const imgFile = req.files.profileImage[0]
+      // If Cloudinary upload happened, cloudinaryUrl is set; else use local filename
+      updateData.profileImage = imgFile.cloudinaryUrl || imgFile.filename
     } else if (req.file) {
-      updateData.profileImage = req.file.filename;
+      updateData.profileImage = req.file.cloudinaryUrl || req.file.filename
     }
 
     // CV upload
     if (req.files?.cv?.[0]) {
-      updateData.cv = req.files.cv[0].filename;
+      const cvUpload = req.files.cv[0]
+      updateData.cv = cvUpload.cloudinaryUrl || cvUpload.filename
     }
 
     const user = await User.findByIdAndUpdate(

@@ -29,9 +29,12 @@ router.post('/', protect, upload.fields([
     const payProof    = req.files?.paymentProof?.[0]
     const sigFile     = req.files?.signatureFile?.[0]
 
+    // Helper: get URL from file (Cloudinary URL or local filename)
+    const fileUrl = (f) => f ? (f.cloudinaryUrl || f.filename) : null
+
     // If no new CV uploaded but student has one saved in profile, use it
-    let cvFileName     = cvFile?.filename        || null
-    let cvOriginalName = cvFile?.originalname    || null
+    let cvFileName     = fileUrl(cvFile)
+    let cvOriginalName = cvFile?.originalname || null
     if (!cvFileName && req.body.useProfileCv === 'true') {
       const studentUser = await require('../models/User.model').findById(req.user.id).select('cv')
       if (studentUser?.cv) {
@@ -64,7 +67,7 @@ router.post('/', protect, upload.fields([
             dueDate,
             status:        i === 1 ? (firstProof ? 'paid' : 'pending') : 'pending',
             paidDate:      i === 1 && firstProof ? now : undefined,
-            proofFile:     i === 1 ? firstProof?.filename : undefined,
+            proofFile:     i === 1 ? fileUrl(firstProof) : undefined,
             paymentMethod: i === 1 ? req.body.paymentMethod : undefined,
             transactionId: i === 1 ? req.body.transactionId : undefined,
           })
@@ -78,7 +81,7 @@ router.post('/', protect, upload.fields([
           dueDate:       new Date(),
           status:        payProof ? 'paid' : 'pending',
           paidDate:      payProof ? new Date() : undefined,
-          proofFile:     payProof?.filename,
+          proofFile:     fileUrl(payProof),
           paymentMethod: req.body.paymentMethod,
           transactionId: req.body.transactionId,
         }]
@@ -108,14 +111,14 @@ router.post('/', protect, upload.fields([
       amountPaid,
       amountRemaining: totalFee - amountPaid,
       installments,
-      paymentProof:   payProof?.filename,
+      paymentProof:   fileUrl(payProof),
       paymentMethod:  req.body.paymentMethod,
       transactionId:  req.body.transactionId,
       // Agreement
       agreementSigned: req.body.agreementSigned === 'true',
-      signatureFile:  sigFile?.filename,
+      signatureFile:  fileUrl(sigFile),
       securityType:   req.body.securityType  || '',
-      securityProof:  req.files?.securityProof?.[0]?.filename || null,
+      securityProof:  fileUrl(req.files?.securityProof?.[0]) || null,
       timeline: [{ status:'Pending', comment:'Application submitted', updatedBy: req.user.name }],
     })
 
@@ -204,7 +207,7 @@ router.post('/:id/installment', protect, upload.single('proofFile'), processUplo
     if (!inst) return res.status(404).json({ message: 'Installment not found' })
     if (inst.status === 'paid') return res.status(400).json({ message: 'Already paid' })
 
-    inst.proofFile     = req.file?.filename
+    inst.proofFile     = req.file?.cloudinaryUrl || req.file?.filename
     inst.paymentMethod = req.body.paymentMethod
     inst.transactionId = req.body.transactionId
     inst.status        = 'paid'
