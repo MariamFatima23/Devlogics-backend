@@ -2,6 +2,7 @@ const express = require('express')
 const router  = express.Router()
 const { protect, adminOnly } = require('../middleware/auth.middleware')
 const upload  = require('../middleware/upload.middleware')
+const { processUploads } = require('../middleware/upload.middleware')
 const CourseApplication = require('../models/CourseApplication.model')
 const Notification = require('../models/Notification.model')
 const Course = require('../models/Course.model')
@@ -12,7 +13,7 @@ router.post('/', protect, upload.fields([
   { name: 'paymentProof',  maxCount: 1 },
   { name: 'signatureFile', maxCount: 1 },
   { name: 'securityProof', maxCount: 1 },
-]), async (req, res) => {
+]), processUploads, async (req, res) => {
   try {
     const course = await Course.findById(req.body.courseId)
     if (!course) return res.status(404).json({ message: 'Course not found' })
@@ -193,7 +194,7 @@ router.patch('/:id/status', protect, adminOnly, async (req, res) => {
 })
 
 // Student: Submit next installment payment proof
-router.post('/:id/installment', protect, upload.single('proofFile'), async (req, res) => {
+router.post('/:id/installment', protect, upload.single('proofFile'), processUploads, async (req, res) => {
   try {
     const app = await CourseApplication.findOne({ _id: req.params.id, studentId: req.user.id })
     if (!app) return res.status(404).json({ message: 'Application not found' })

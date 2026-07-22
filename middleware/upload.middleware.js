@@ -1,45 +1,105 @@
-const multer = require('multer');
-const path = require('path');
-const crypto = require('crypto');
-const fs = require('fs');
+const multer  = require('multer');
+const path    = require('path');
+const crypto  = require('crypto');
+const fs      = require('fs');
+const cloudinary = require('../utils/cloudinary');
 
-// Use memory storage on Vercel (serverless), disk storage locally
-const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production'
-
-const storage = isVercel
-  ? multer.memoryStorage()
-  : multer.diskStorage({
-      destination: (req, file, cb) => {
-        const uploadDir = 'uploads/'
-        if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true })
-        cb(null, uploadDir);
-      },
-      filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname);
-        cb(null, `${crypto.randomUUID()}${ext}`);
-      },
-    });
+// ─── Allowed MIME types ───────────────────────────────────────
+const allowedTypes = [
+  'application/pdf',
+  'image/jpeg', 'image/png', 'image/jpg',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
 
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = [
-    'application/pdf',
-    'image/jpeg',
-    'image/png',
-    'image/jpg',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  ];
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only PDF, JPG, PNG, DOC, DOCX files are allowed'), false);
+  if (allowedTypes.includes(file.mimetype)) cb(null, true);
+  else cb(new Error('Only PDF, JPG, PNG, DOC, DOCX files are allowed'), false);
+};
+
+// ─── Disk storage (local dev) ─────────────────────────────────
+const diskStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '..', 'uploads');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${crypto.randomUUID()}${path.extname(file.originalname)}`);
+  },
+});
+
+// ─── Memory storage (Vercel — files go to Cloudinary) ────────
+const memStorage = multer.memoryStorage();
+
+const isProduction = !!(process.env.VERCEL || process.env.NODE_ENV === 'production');
+
+const upload = multer({
+  storage:    isProduction ? memStorage : diskStorage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+// ─── Helper: upload a buffer to Cloudinary ───────────────────
+const uploadToCloudinary = (buffer, originalname, mimetype) => {
+  return new Promise((resolve, reject) => {
+    // Determine resource_type
+    const isPdf = mimetype === 'application/pdf';
+    const isDoc = mimetype.includes('word') || mimetype.includes('officedocument');
+    const resourceType = (isPdf || isDoc) ? 'raw' : 'image';
+
+    const ext    = path.extname(originalname);
+    const pubId  = crypto.randomUUID();
+
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        public_id:     pubId,
+        resource_type: resourceType,
+        folder:        'eportal',
+        use_filename:  false,
+        unique_filename: true,
+      },
+      (err, result) => {
+        if (err) return reject(err);
+        // Store filename as "publicId + ext" so existing code using
+        // user.cv / user.profileImage continues to work via /uploads proxy
+        result.storedFilename = `${pubId}${ext}`;
+        resolve(result);
+      }
+    );
+    stream.end(buffer);
+  });
+};
+
+// ─── Middleware: after multer, push memory files to Cloudinary ─
+const processUploads = async (req, res, next) => {
+  if (!isProduction) return next(); // local: multer wrote to disk already
+
+  try {
+    const uploadFile = async (file) => {
+      const result = await uploadToCloudinary(file.buffer, file.originalname, file.mimetype);
+      file.filename      = result.storedFilename;
+      file.cloudinaryUrl = result.secure_url;
+      file.cloudinaryId  = result.public_id;
+    };
+
+    if (req.files) {
+      // upload.fields() — req.files is { fieldName: [file, ...] }
+      const promises = [];
+      for (const field of Object.values(req.files)) {
+        for (const file of field) promises.push(uploadFile(file));
+      }
+      await Promise.all(promises);
+    } else if (req.file) {
+      await uploadFile(req.file);
+    }
+
+    next();
+  } catch (err) {
+    console.error('Cloudinary upload error:', err);
+    res.status(500).json({ message: 'File upload failed', detail: err.message });
   }
 };
 
-const upload = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
-});
-
 module.exports = upload;
+module.exports.processUploads = processUploads;
