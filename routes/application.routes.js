@@ -2,6 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const { protect, adminOnly } = require('../middleware/auth.middleware');
 const upload = require('../middleware/upload.middleware');
+const { processUploads } = require('../middleware/upload.middleware');
 const {
   submitApplication,
   getMyApplications,
@@ -15,7 +16,7 @@ const {
 router.get('/stats', protect, getStats);
 
 // Student routes
-router.post('/', protect, upload.array('attachments', 5), submitApplication);
+router.post('/', protect, upload.array('attachments', 5), processUploads, submitApplication);
 router.get('/my-applications', protect, getMyApplications);
 router.get('/:id', protect, getApplicationById);
 

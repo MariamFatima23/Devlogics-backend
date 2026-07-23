@@ -2,6 +2,7 @@ const express = require('express')
 const router  = express.Router()
 const { protect, adminOnly } = require('../middleware/auth.middleware')
 const upload  = require('../middleware/upload.middleware')
+const { processUploads } = require('../middleware/upload.middleware')
 const Review  = require('../models/Review.model')
 
 // Public: get approved reviews (max 10)
@@ -14,13 +15,13 @@ router.get('/', async (req, res) => {
 })
 
 // Student: submit a review with image
-router.post('/', protect, upload.single('studentImage'), async (req, res) => {
+router.post('/', protect, upload.single('studentImage'), processUploads, async (req, res) => {
   try {
     const review = await Review.create({
       studentId:    req.user.id,
       studentName:  req.user.name,
       studentEmail: req.user.email,
-      studentImage: req.file?.filename || '',
+      studentImage: req.file?.cloudinaryUrl || req.file?.filename || '',
       courseType:   req.body.courseType || 'Course',
       courseName:   req.body.courseName || '',
       description:  req.body.description,

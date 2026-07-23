@@ -2,6 +2,7 @@ const express  = require('express')
 const router   = express.Router()
 const { protect, adminOnly } = require('../middleware/auth.middleware')
 const upload   = require('../middleware/upload.middleware')
+const { processUploads } = require('../middleware/upload.middleware')
 const SiteSettings = require('../models/SiteSettings.model')
 
 // Public: get settings
@@ -20,7 +21,7 @@ router.get('/', async (req, res) => {
 })
 
 // Admin: update settings (with optional logo upload)
-router.patch('/', protect, adminOnly, upload.single('logo'), async (req, res) => {
+router.patch('/', protect, adminOnly, upload.single('logo'), processUploads, async (req, res) => {
   try {
     let settings = await SiteSettings.findOne()
     if (!settings) settings = new SiteSettings()
@@ -46,8 +47,8 @@ router.patch('/', protect, adminOnly, upload.single('logo'), async (req, res) =>
       } catch { /* ignore */ }
     }
 
-    if (req.file) settings.logoUrl = req.file.filename
-    if (req.body.aboutImage && req.file) settings.aboutImageUrl = req.file.filename
+    if (req.file) settings.logoUrl = req.file.cloudinaryUrl || req.file.filename
+    if (req.body.aboutImage && req.file) settings.aboutImageUrl = req.file.cloudinaryUrl || req.file.filename
 
     await settings.save()
     res.json(settings)

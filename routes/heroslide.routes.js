@@ -2,6 +2,7 @@ const express  = require('express')
 const router   = express.Router()
 const { protect, adminOnly } = require('../middleware/auth.middleware')
 const upload   = require('../middleware/upload.middleware')
+const { processUploads } = require('../middleware/upload.middleware')
 const HeroSlide = require('../models/HeroSlide.model')
 
 // Public: get active slides
@@ -21,10 +22,10 @@ router.get('/all', protect, adminOnly, async (req, res) => {
 })
 
 // Admin: upload slide image + create
-router.post('/', protect, adminOnly, upload.single('image'), async (req, res) => {
+router.post('/', protect, adminOnly, upload.single('image'), processUploads, async (req, res) => {
   try {
     const imageUrl = req.file
-      ? `http://localhost:5000/uploads/${req.file.filename}`
+      ? (req.file.cloudinaryUrl || `http://localhost:5000/uploads/${req.file.filename}`)
       : req.body.imageUrl
     const slide = await HeroSlide.create({
       imageUrl,

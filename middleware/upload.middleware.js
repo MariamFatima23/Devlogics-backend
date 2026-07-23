@@ -32,7 +32,12 @@ const diskStorage = multer.diskStorage({
 // ─── Memory storage (Vercel — files go to Cloudinary) ────────
 const memStorage = multer.memoryStorage();
 
-const isProduction = !!(process.env.VERCEL || process.env.NODE_ENV === 'production');
+// Use Cloudinary whenever credentials are present (local dev + production)
+const isProduction = !!(
+  process.env.VERCEL ||
+  process.env.NODE_ENV === 'production' ||
+  (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
+);
 
 const upload = multer({
   storage:    isProduction ? memStorage : diskStorage,

@@ -18,12 +18,17 @@ const submitApplication = async (req, res) => {
     const { type, title, description, rollNumber, department, batchester } = req.body;
 
     // Build attachments array from uploaded files
-    const attachments = (req.files || []).map((file) => ({
+    const rawFiles = Array.isArray(req.files)
+      ? req.files
+      : Object.values(req.files || {}).flat();
+
+    const attachments = rawFiles.map((file) => ({
       originalName: file.originalname,
-      fileName: file.filename,
-      filePath: file.path,
-      fileSize: file.size,
-      mimeType: file.mimetype,
+      fileName:     file.filename,
+      // Use Cloudinary URL if available, otherwise fall back to local path
+      filePath:     file.cloudinaryUrl || file.path || '',
+      fileSize:     file.size,
+      mimeType:     file.mimetype,
     }));
 
     const application = await Application.create({
