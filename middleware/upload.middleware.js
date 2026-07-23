@@ -29,18 +29,13 @@ const diskStorage = multer.diskStorage({
   },
 });
 
-// ─── Memory storage (Vercel — files go to Cloudinary) ────────
+// ─── Memory storage (always — Cloudinary handles persistence) ────
 const memStorage = multer.memoryStorage();
 
-// Use Cloudinary whenever credentials are present (local dev + production)
-const isProduction = !!(
-  process.env.VERCEL ||
-  process.env.NODE_ENV === 'production' ||
-  (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
-);
-
+// Always use memoryStorage so processUploads can push to Cloudinary.
+// Disk storage is only a local fallback when Cloudinary creds are absent.
 const upload = multer({
-  storage:    isProduction ? memStorage : diskStorage,
+  storage:    memStorage,
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 },
 });
@@ -78,7 +73,15 @@ const uploadToCloudinary = (buffer, originalname, mimetype) => {
 
 // ─── Middleware: after multer, push memory files to Cloudinary ─
 const processUploads = async (req, res, next) => {
-  if (!isProduction) return next(); // local: multer wrote to disk already
+  // Check at runtime whether Cloudinary credentials are available
+  const hasCloudinary = !!(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+  );
+
+  // If no Cloudinary creds, files already on disk — skip
+  if (!hasCloudinary) return next();
 
   try {
     const uploadFile = async (file) => {
