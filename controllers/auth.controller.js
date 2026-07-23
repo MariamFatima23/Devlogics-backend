@@ -13,6 +13,7 @@ const generateToken = (user) =>
       profileImage: user.profileImage, cnic: user.cnic,
       gender: user.gender, dob: user.dob,
       country: user.country, city: user.city,
+      qualification: user.qualification, cv: user.cv,
     },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
@@ -47,6 +48,8 @@ const register = async (req, res) => {
         gender: user.gender, dob: user.dob,
         country: user.country, city: user.city,
         profileImage: user.profileImage,
+        qualification: user.qualification,
+        cv: user.cv,
       },
     });
   } catch (err) {
@@ -79,6 +82,8 @@ const login = async (req, res) => {
         gender: user.gender, dob: user.dob,
         country: user.country, city: user.city,
         profileImage: user.profileImage,
+        qualification: user.qualification,
+        cv: user.cv,
       },
     });
   } catch (err) {
