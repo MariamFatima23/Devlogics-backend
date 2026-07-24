@@ -23,34 +23,24 @@ app.use(cors({
 app.use(express.json())
 
 // ── /uploads handler ─────────────────────────────────────────────
-// On Vercel (production) there is no local disk — files go to Cloudinary.
-// If a stored URL is a full Cloudinary URL (old records may have been saved
-// as just the filename, or the full URL was stored and the frontend accidentally
-// prepended /uploads/).  This handler catches both cases:
-//   • /uploads/https:/res.cloudinary.com/... → redirect to the real Cloudinary URL
-//   • /uploads/<filename>                    → 302 to Cloudinary lookup (local dev only)
+// Cloudinary URLs stored in DB are full https:// URLs.
+// If frontend accidentally prefixes them with /uploads/, we redirect.
+// Also handles single-slash normalisation: "https:/res..." → "https://res..."
 app.use('/uploads', (req, res, next) => {
-  // req.path starts with '/', e.g. '/https:/res.cloudinary.com/...' or '/abc.png'
-  const raw = req.path.slice(1); // strip leading slash
+  const raw = req.path.slice(1); // strip leading '/'
 
-  // Case 1: the path itself IS a full URL (frontend accidentally prefixed it)
-  // It looks like "https:/res.cloudinary.com/..." (one slash due to URL normalisation)
-  // or "https://res.cloudinary.com/..."
-  if (raw.startsWith('https:/') || raw.startsWith('http:/')) {
-    // Reconstruct the proper double-slash URL
-    const fixed = raw.replace(/^https?:\/?\//, (m) => {
-      // ensure exactly two slashes
-      return m.startsWith('https') ? 'https://' : 'http://';
-    });
+  // Detect embedded full URL — either "https://..." or "https:/..." (browser normalized)
+  if (/^https?:\//.test(raw)) {
+    // Ensure exactly double slash
+    const fixed = raw.replace(/^(https?):\/+/, '$1://');
     return res.redirect(301, fixed);
   }
 
-  // Case 2: local dev — serve from disk
+  // Local dev — serve static files from disk
   if (!process.env.VERCEL) {
-    return next(); // fall through to express.static below
+    return next();
   }
 
-  // Case 3: Vercel production + plain filename — nothing we can do, 404
   return res.status(404).json({ message: 'File not found. Files are served from Cloudinary.' });
 });
 

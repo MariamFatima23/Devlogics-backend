@@ -50,14 +50,17 @@ const uploadToCloudinary = (buffer, originalname, mimetype) => {
 
     const ext    = path.extname(originalname);
     const pubId  = crypto.randomUUID();
+    // For raw files (PDF/DOC), include extension in public_id so Cloudinary
+    // preserves it in the download filename
+    const publicId = (isPdf || isDoc) ? `${pubId}${ext}` : pubId;
 
     const stream = cloudinary.uploader.upload_stream(
       {
-        public_id:     pubId,
+        public_id:     publicId,
         resource_type: resourceType,
         folder:        'eportal',
         use_filename:  false,
-        unique_filename: true,
+        unique_filename: false,
       },
       (err, result) => {
         if (err) return reject(err);
@@ -70,7 +73,6 @@ const uploadToCloudinary = (buffer, originalname, mimetype) => {
   });
 };
 
-// ─── Middleware: after multer, push memory files to Cloudinary ─
 const processUploads = async (req, res, next) => {
   // Check at runtime whether Cloudinary credentials are available
   const hasCloudinary = !!(
