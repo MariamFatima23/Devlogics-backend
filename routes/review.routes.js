@@ -1,9 +1,8 @@
 const express = require('express')
 const router  = express.Router()
 const { protect, adminOnly } = require('../middleware/auth.middleware')
-const upload  = require('../middleware/upload.middleware')
-const { processUploads } = require('../middleware/upload.middleware')
 const Review  = require('../models/Review.model')
+const User    = require('../models/User.model')
 
 // Public: get approved reviews (max 10)
 router.get('/', async (req, res) => {
@@ -14,14 +13,18 @@ router.get('/', async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }) }
 })
 
-// Student: submit a review with image
-router.post('/', protect, upload.single('studentImage'), processUploads, async (req, res) => {
+// Student: submit a review — image is taken from student's saved profile
+router.post('/', protect, async (req, res) => {
   try {
+    // Fetch the latest profileImage directly from DB (JWT may be stale)
+    const student = await User.findById(req.user.id).select('profileImage')
+    const studentImage = student?.profileImage || req.user.profileImage || ''
+
     const review = await Review.create({
       studentId:    req.user.id,
       studentName:  req.user.name,
       studentEmail: req.user.email,
-      studentImage: req.file?.cloudinaryUrl || req.file?.filename || '',
+      studentImage,                               // from profile — no separate upload needed
       courseType:   req.body.courseType || 'Course',
       courseName:   req.body.courseName || '',
       description:  req.body.description,
