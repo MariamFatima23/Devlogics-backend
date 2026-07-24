@@ -25,7 +25,7 @@ router.get('/all', protect, adminOnly, async (req, res) => {
 router.post('/', protect, adminOnly, upload.single('image'), processUploads, async (req, res) => {
   try {
     const imageUrl = req.file
-      ? (req.file.cloudinaryUrl || `http://localhost:5000/uploads/${req.file.filename}`)
+      ? (req.file.cloudinaryUrl || req.file.filename || '')
       : req.body.imageUrl
     const slide = await HeroSlide.create({
       imageUrl,

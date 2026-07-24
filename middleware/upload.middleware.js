@@ -61,8 +61,7 @@ const uploadToCloudinary = (buffer, originalname, mimetype) => {
       },
       (err, result) => {
         if (err) return reject(err);
-        // Store filename as "publicId + ext" so existing code using
-        // user.cv / user.profileImage continues to work via /uploads proxy
+        // storedFilename kept for reference; secure_url is the canonical URL
         result.storedFilename = `${pubId}${ext}`;
         resolve(result);
       }
@@ -86,9 +85,12 @@ const processUploads = async (req, res, next) => {
   try {
     const uploadFile = async (file) => {
       const result = await uploadToCloudinary(file.buffer, file.originalname, file.mimetype);
-      file.filename      = result.storedFilename;
+      // Use Cloudinary URL as the primary filename so any code doing
+      // `file.cloudinaryUrl || file.filename` always gets the full URL.
+      file.filename      = result.secure_url;
       file.cloudinaryUrl = result.secure_url;
       file.cloudinaryId  = result.public_id;
+      file.storedFilename = result.storedFilename; // keep for reference if needed
     };
 
     if (req.files) {
