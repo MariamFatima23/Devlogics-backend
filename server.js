@@ -107,6 +107,9 @@ app.use('/api/reviews',             require('./routes/review.routes'))
 app.use('/api/student-pride',       require('./routes/studentPride.routes'))
 app.use('/api/site-settings',       require('./routes/siteSettings.routes'))
 app.use('/api/contact',             require('./routes/contact.routes'))
+app.use('/api/leads',               require('./routes/lead.routes'))
+app.use('/api/team-members',        require('./routes/teamMember.routes'))
+app.use('/api/meetings',            require('./routes/meeting.routes'))
 
 // ── Local dev server ─────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'production') {
