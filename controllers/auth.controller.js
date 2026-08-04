@@ -14,6 +14,7 @@ const generateToken = (user) =>
       gender: user.gender, dob: user.dob,
       country: user.country, city: user.city,
       qualification: user.qualification, cv: user.cv,
+      teamMemberRef: user.teamMemberRef || null,
     },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
@@ -84,6 +85,7 @@ const login = async (req, res) => {
         profileImage: user.profileImage,
         qualification: user.qualification,
         cv: user.cv,
+        teamMemberRef: user.teamMemberRef || null,
       },
     });
   } catch (err) {

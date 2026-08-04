@@ -21,4 +21,12 @@ const adminOnly = (req, res, next) => {
   next();
 };
 
-module.exports = { protect, adminOnly };
+// Admin OR team_member can access
+const crmAccess = (req, res, next) => {
+  if (!['admin', 'team_member'].includes(req.user?.role)) {
+    return res.status(403).json({ message: 'Access denied' });
+  }
+  next();
+};
+
+module.exports = { protect, adminOnly, crmAccess };

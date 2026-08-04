@@ -16,6 +16,7 @@ const teamMemberSchema = new mongoose.Schema(
       default: 'Active',
     },
     addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    userId:  { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, // linked login account
   },
   { timestamps: true }
 )

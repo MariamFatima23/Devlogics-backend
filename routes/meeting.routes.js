@@ -1,13 +1,14 @@
 const router = require('express').Router()
-const { protect, adminOnly } = require('../middleware/auth.middleware')
+const { protect, adminOnly, crmAccess } = require('../middleware/auth.middleware')
 const { getAllMeetings, getMeeting, createMeeting, updateMeeting, deleteMeeting } = require('../controllers/meeting.controller')
 
-router.use(protect, adminOnly)
+// Admin sees all meetings
+router.get('/',       protect, adminOnly, getAllMeetings)
+router.get('/:id',    protect, adminOnly, getMeeting)
+router.delete('/:id', protect, adminOnly, deleteMeeting)
 
-router.get('/',       getAllMeetings)
-router.get('/:id',    getMeeting)
-router.post('/',      createMeeting)
-router.put('/:id',    updateMeeting)
-router.delete('/:id', deleteMeeting)
+// Both admin & team_member can schedule meetings
+router.post('/',      protect, crmAccess, createMeeting)
+router.put('/:id',    protect, crmAccess, updateMeeting)
 
 module.exports = router
