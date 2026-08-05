@@ -19,6 +19,7 @@ const meetingSchema = new mongoose.Schema(
       default: 'Other',
     },
     topic:        { type: String, required: true },
+    meetingLink:  { type: String, default: '' }, // Zoom/Google Meet link (manually pasted)
     scheduledAt:  { type: Date, required: true },
     durationMins: { type: Number, default: 30 }, // duration in minutes
 
