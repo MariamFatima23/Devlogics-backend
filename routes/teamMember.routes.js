@@ -87,13 +87,12 @@ router.get('/my-meetings', protect, crmAccess, async (req, res) => {
 })
 
 // ── Team member: update meeting outcome / reschedule ────────────
-router.put('/meetings/:meetingId', protect, crmAccess, async (req, res) => {
+router.put('/meetings/:meetingId/reschedule', protect, crmAccess, async (req, res) => {
   try {
+    const { newScheduledDate, rescheduleReason } = req.body
     const meeting = await Meeting.findById(req.params.meetingId)
-      .populate('leadId', 'clientName')
     if (!meeting) return res.status(404).json({ message: 'Meeting not found' })
 
-    // team_member can only update their own meetings
     if (req.user.role === 'team_member') {
       const TeamMember = require('../models/TeamMember.model')
       const member = await TeamMember.findOne({ userId: req.user.id })
@@ -102,15 +101,74 @@ router.put('/meetings/:meetingId', protect, crmAccess, async (req, res) => {
       }
     }
 
-    const update = { ...req.body }
-    if (req.body.status === 'Rescheduled' && req.body.scheduledAt) {
-      update.rescheduledAt = new Date()
-    }
-    if (req.body.outcome === 'Converted' && meeting.leadId) {
-      await Lead.findByIdAndUpdate(meeting.leadId._id || meeting.leadId, { status: 'Converted' })
+    meeting.rescheduleHistory.push({
+      previousDate: meeting.scheduledAt,
+      rescheduledAt: new Date(),
+      reason: rescheduleReason || '',
+    })
+    meeting.scheduledAt      = new Date(newScheduledDate || req.body.scheduledAt)
+    meeting.status           = 'Pending'
+    meeting.rescheduledAt    = new Date()
+    meeting.rescheduleReason = rescheduleReason || ''
+    await meeting.save()
+
+    const updated = await Meeting.findById(meeting._id).populate('leadId', 'clientName contact source grade status')
+    res.json(updated)
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+router.put('/meetings/:meetingId/complete', protect, crmAccess, async (req, res) => {
+  try {
+    const { outcome, outcomeNotes, nextActionDate } = req.body
+    const meeting = await Meeting.findById(req.params.meetingId)
+    if (!meeting) return res.status(404).json({ message: 'Meeting not found' })
+
+    if (req.user.role === 'team_member') {
+      const TeamMember = require('../models/TeamMember.model')
+      const member = await TeamMember.findOne({ userId: req.user.id })
+      if (!member || meeting.teamMemberId?.toString() !== member._id.toString()) {
+        return res.status(403).json({ message: 'Not your meeting' })
+      }
     }
 
-    const updated = await Meeting.findByIdAndUpdate(req.params.meetingId, update, { new: true })
+    const OUTCOME_LEAD_STATUS = {
+      'Converted':            'Converted',
+      'Not Interested':       'Lost',
+      'Follow-up Required':   'In Progress',
+      'Interested':           'In Progress',
+      'Objection':            'In Progress',
+      'No Show':              'Assigned',
+    }
+
+    meeting.status       = 'Completed'
+    meeting.outcome      = outcome || ''
+    meeting.outcomeNotes = outcomeNotes || ''
+    if (nextActionDate) meeting.nextActionDate = new Date(nextActionDate)
+    await meeting.save()
+
+    if (outcome && OUTCOME_LEAD_STATUS[outcome]) {
+      await Lead.findByIdAndUpdate(meeting.leadId, { status: OUTCOME_LEAD_STATUS[outcome] })
+    }
+
+    const updated = await Meeting.findById(meeting._id).populate('leadId', 'clientName contact source grade status')
+    res.json(updated)
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
+router.put('/meetings/:meetingId', protect, crmAccess, async (req, res) => {
+  try {
+    const meeting = await Meeting.findById(req.params.meetingId)
+    if (!meeting) return res.status(404).json({ message: 'Meeting not found' })
+
+    if (req.user.role === 'team_member') {
+      const TeamMember = require('../models/TeamMember.model')
+      const member = await TeamMember.findOne({ userId: req.user.id })
+      if (!member || meeting.teamMemberId?.toString() !== member._id.toString()) {
+        return res.status(403).json({ message: 'Not your meeting' })
+      }
+    }
+
+    const updated = await Meeting.findByIdAndUpdate(req.params.meetingId, req.body, { new: true })
       .populate('leadId', 'clientName contact source grade status')
     res.json(updated)
   } catch (err) { res.status(500).json({ message: err.message }) }

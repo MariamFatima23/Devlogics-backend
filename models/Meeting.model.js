@@ -33,6 +33,13 @@ const meetingSchema = new mongoose.Schema(
     rescheduleReason: { type: String, default: '' },
     rescheduledAt:    { type: Date },
 
+    // Full reschedule history
+    rescheduleHistory: [{
+      previousDate:   { type: Date },
+      rescheduledAt:  { type: Date, default: Date.now },
+      reason:         { type: String, default: '' },
+    }],
+
     // After meeting outcome
     outcome: {
       type: String,
