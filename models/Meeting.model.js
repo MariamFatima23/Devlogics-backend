@@ -4,6 +4,7 @@ const meetingSchema = new mongoose.Schema(
   {
     leadId:       { type: mongoose.Schema.Types.ObjectId, ref: 'Lead', required: true },
     leadName:     { type: String },
+    leadContact:  { type: String, default: '' }, // saved for WhatsApp
 
     teamMemberId: { type: mongoose.Schema.Types.ObjectId, ref: 'TeamMember' },
     teamMemberName: { type: String },

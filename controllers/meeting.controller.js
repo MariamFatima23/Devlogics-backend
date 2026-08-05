@@ -91,6 +91,7 @@ const createMeeting = async (req, res) => {
     const meeting = await Meeting.create({
       leadId,
       leadName:       lead.clientName,
+      leadContact:    lead.contact || '',
       teamMemberId:   teamMemberId || null,
       teamMemberName: teamMemberName || '',
       meetingType,
