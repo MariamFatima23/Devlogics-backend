@@ -44,7 +44,7 @@ const meetingSchema = new mongoose.Schema(
     // After meeting outcome
     outcome: {
       type: String,
-      enum: ['Interested', 'Not Interested', 'Objection', 'Follow-up Required', 'Converted', 'No Show', 'Pending', ''],
+      enum: ['Interested', 'Not Interested', 'Objection', 'Follow-up Required', 'Converted', 'No Show', ''],
       default: '',
     },
     outcomeNotes:   { type: String, default: '' },
