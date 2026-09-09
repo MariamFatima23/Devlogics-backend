@@ -18,32 +18,39 @@ const app = express();
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: (origin, cb) => {
-      if (!origin || origin.includes('vercel.app') || origin.includes('localhost')) cb(null, true)
+    origin: function(origin, cb) {
+      if (!origin || origin.includes('vercel.app') || origin.includes('localhost') || origin.includes('127.0.0.1'))
+        cb(null, true)
       else cb(new Error('Not allowed by CORS'))
     },
     credentials: true,
+    methods: ['GET', 'POST'],
   },
   transports: ['websocket', 'polling'],
 });
 
 // ── CORS ────────────────────────────────────────────────────────
-app.use(cors({
+const corsOptions = {
   origin: function(origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, Postman)
     if (!origin) return callback(null, true)
+    // Allow any vercel.app subdomain + localhost
     if (
       origin.includes('vercel.app') ||
-      origin.includes('localhost')
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1')
     ) {
       return callback(null, true)
     }
     callback(new Error('Not allowed by CORS'))
   },
   credentials: true,
-}))
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Authorization', 'Content-Type', 'Accept'],
+}
 
-// ── Explicit OPTIONS preflight handler ───────────────────────────
-app.options('*', cors())
+app.use(cors(corsOptions))
+app.options('*', cors(corsOptions))
 
 app.use(express.json())
 
