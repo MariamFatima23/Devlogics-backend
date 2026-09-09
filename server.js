@@ -41,6 +41,10 @@ app.use(cors({
   },
   credentials: true,
 }))
+
+// ── Explicit OPTIONS preflight handler ───────────────────────────
+app.options('*', cors())
+
 app.use(express.json())
 
 // ── /uploads handler ─────────────────────────────────────────────
