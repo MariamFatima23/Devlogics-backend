@@ -271,6 +271,41 @@ router.patch('/:id/installment/:no/verify', protect, adminOnly, async (req, res)
   } catch (err) { res.status(500).json({ message: err.message }) }
 })
 
+// Student: Fee summary — real payment data for FeeStatus component
+router.get('/fee-summary', protect, async (req, res) => {
+  try {
+    const apps = await CourseApplication.find({ studentId: req.user.id }).sort({ createdAt: -1 })
+
+    const summary = apps.map(app => ({
+      _id:             app._id,
+      courseName:      app.courseName,
+      courseType:      app.courseType,
+      status:          app.status,
+      paymentPlan:     app.paymentPlan,
+      totalFee:        app.totalFee,
+      amountPaid:      app.amountPaid,
+      amountRemaining: app.amountRemaining,
+      installments:    app.installments.map(inst => ({
+        installmentNo: inst.installmentNo,
+        amount:        inst.amount,
+        dueDate:       inst.dueDate,
+        paidDate:      inst.paidDate,
+        status:        inst.status,
+        verifiedBy:    inst.verifiedBy,
+        verifiedAt:    inst.verifiedAt,
+        note:          inst.note,
+      })),
+      createdAt: app.createdAt,
+    }))
+
+    const totalFee       = summary.reduce((s, a) => s + (a.totalFee || 0), 0)
+    const totalPaid      = summary.reduce((s, a) => s + (a.amountPaid || 0), 0)
+    const totalRemaining = summary.reduce((s, a) => s + (a.amountRemaining || 0), 0)
+
+    res.json({ applications: summary, totalFee, totalPaid, totalRemaining })
+  } catch (err) { res.status(500).json({ message: err.message }) }
+})
+
 // Admin: Stats
 router.get('/stats', protect, adminOnly, async (req, res) => {
   try {

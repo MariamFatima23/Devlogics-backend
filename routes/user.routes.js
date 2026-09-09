@@ -4,6 +4,7 @@ const { protect, adminOnly } = require('../middleware/auth.middleware');
 const upload   = require('../middleware/upload.middleware');
 const { processUploads } = require('../middleware/upload.middleware');
 const { getAllUsers, getUserById, updateProfile, blockUser, adminStats } = require('../controllers/user.controller');
+const { resetDevice } = require('../controllers/attendance.controller');
 
 // Update own profile (with optional image + CV)
 router.patch('/profile', protect, upload.fields([
@@ -15,6 +16,7 @@ router.patch('/profile', protect, upload.fields([
 router.get('/',            protect, adminOnly, getAllUsers);
 router.get('/admin-stats', protect, adminOnly, adminStats);
 router.get('/:id',         protect, adminOnly, getUserById);
-router.patch('/:id/block', protect, adminOnly, blockUser);
+router.patch('/:id/block',        protect, adminOnly, blockUser);
+router.put('/:id/reset-device',   protect, adminOnly, resetDevice);
 
 module.exports = router;

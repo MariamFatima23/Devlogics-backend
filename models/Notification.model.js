@@ -22,11 +22,18 @@ const notificationSchema = new mongoose.Schema(
         'rejected',
         'new_course',
         'new_announcement',
+        // Payment notifications
+        'payment_received',
+        'payment_verified',
         // Admin notifications
         'new_student',
         'new_review',
         'new_course_application',
         'new_general_application',
+        // Subscription notifications
+        'subscription_due',
+        'subscription_overdue',
+        'subscription_assigned',
       ],
       required: true,
     },

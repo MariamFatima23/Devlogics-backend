@@ -15,6 +15,8 @@ const generateToken = (user) =>
       country: user.country, city: user.city,
       qualification: user.qualification, cv: user.cv,
       teamMemberRef: user.teamMemberRef || null,
+      financeAccess: user.financeAccess || false,
+      mustChangePassword: user.mustChangePassword || false,
     },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
@@ -61,7 +63,7 @@ const register = async (req, res) => {
 /* ── Login ─────────────────────────── */
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, deviceId } = req.body;
 
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: 'Invalid email or password' });
@@ -69,6 +71,24 @@ const login = async (req, res) => {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid email or password' });
+
+    // ── Device binding — enforced for everyone EXCEPT admin ──────
+    if (user.role !== 'admin') {
+      if (!deviceId) {
+        return res.status(400).json({ message: 'Device identification missing. Please clear browser cache and try again.' });
+      }
+      if (!user.deviceId) {
+        // First ever login — lock this device permanently
+        user.deviceId = deviceId;
+        await user.save();
+      } else if (user.deviceId !== deviceId) {
+        // Different device detected — block login
+        return res.status(403).json({
+          message: 'You can only login from your registered device. If your device has changed, contact admin.',
+          code: 'DEVICE_MISMATCH',
+        });
+      }
+    }
 
     const token = generateToken(user);
 
@@ -86,6 +106,8 @@ const login = async (req, res) => {
         qualification: user.qualification,
         cv: user.cv,
         teamMemberRef: user.teamMemberRef || null,
+        financeAccess: user.financeAccess || false,
+        mustChangePassword: user.mustChangePassword || false,
       },
     });
   } catch (err) {
@@ -159,13 +181,21 @@ const changePassword = async (req, res) => {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) return res.status(400).json({ message: 'Current password is incorrect' });
+    // If mustChangePassword is true (first login), skip current password check
+    if (!user.mustChangePassword) {
+      if (!currentPassword) return res.status(400).json({ message: 'Current password required' });
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) return res.status(400).json({ message: 'Current password is incorrect' });
+    }
 
-    user.password = await bcrypt.hash(newPassword, 10);
+    user.password           = await bcrypt.hash(newPassword, 10);
+    user.mustChangePassword = false;   // clear the flag
     await user.save();
 
-    res.json({ message: 'Password changed successfully' });
+    // Return a fresh token with mustChangePassword = false
+    const token = generateToken(user);
+
+    res.json({ message: 'Password changed successfully', token });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

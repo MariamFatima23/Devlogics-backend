@@ -2,6 +2,7 @@ const nodemailer = require('nodemailer');
 
 const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASS;
+const EMAIL_FROM_NAME = 'DevLogics Skill Center';
 
 const isConfigured =
   EMAIL_USER &&
@@ -33,6 +34,35 @@ if (isConfigured) {
   console.warn('⚠️  Email not configured. Reset links will be printed to console.');
   console.warn('   Set EMAIL_USER and EMAIL_PASS in backend/.env to send real emails.');
 }
+
+const getFromAddress = () => {
+  if (!EMAIL_USER) return `"${EMAIL_FROM_NAME}" <no-reply@devlogics.com>`;
+  return `"${EMAIL_FROM_NAME}" <${EMAIL_USER}>`;
+};
+
+const sendEmail = async (toEmail, subject, html, text) => {
+  if (!toEmail) throw new Error('Missing recipient email');
+
+  if (!transporter) {
+    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📧  EMAIL FALLBACK  (dev mode — email NOT sent)');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`👤  To   : ${toEmail}`);
+    console.log(`📨  Subj : ${subject}`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(text || html);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    return;
+  }
+
+  await transporter.sendMail({
+    from: getFromAddress(),
+    to: toEmail,
+    subject,
+    html,
+    text,
+  });
+};
 
 /* ── Send reset email ─────────────────────────────────────── */
 const sendResetEmail = async (toEmail, resetToken, userName) => {
@@ -120,4 +150,4 @@ const sendResetEmail = async (toEmail, resetToken, userName) => {
   console.log(`✅ Reset email sent to ${toEmail}`);
 };
 
-module.exports = { sendResetEmail };
+module.exports = { sendResetEmail, sendEmail };

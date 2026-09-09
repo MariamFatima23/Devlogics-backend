@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema(
     name:         { type: String, required: [true, 'Name is required'], trim: true },
     email:        { type: String, required: [true, 'Email is required'], unique: true, lowercase: true, trim: true },
     password:     { type: String, required: [true, 'Password is required'], minlength: 6 },
-    role:         { type: String, enum: ['student', 'admin', 'team_member'], default: 'student' },
+    role:         { type: String, enum: ['student', 'admin', 'team_member', 'product_manager'], default: 'student' },
 
     // For team_member role — links back to TeamMember record
     teamMemberRef: { type: mongoose.Schema.Types.ObjectId, ref: 'TeamMember', default: null },
@@ -25,6 +25,15 @@ const userSchema = new mongoose.Schema(
     batchester:   { type: String, default: '' },
     qualification:{ type: String, default: '' },
     cv:           { type: String, default: '' },  // uploaded CV filename
+
+    // Permissions
+    financeAccess: { type: Boolean, default: false },
+
+    // First-login password change flag (set true when account auto-created)
+    mustChangePassword: { type: Boolean, default: false },
+
+    // Device binding — locked on first login for team_member role
+    deviceId: { type: String, default: null },
 
     // Status
     isBlocked: { type: Boolean, default: false },

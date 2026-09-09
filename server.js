@@ -3,13 +3,29 @@ const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
 dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 
-const express  = require('express');
-const mongoose = require('mongoose');
-const cors     = require('cors');
-const path     = require('path');
+const express   = require('express');
+const http      = require('http');
+const { Server } = require('socket.io');
+const mongoose  = require('mongoose');
+const cors      = require('cors');
+const path      = require('path');
+const jwt       = require('jsonwebtoken');
 require('dotenv').config();
 
 const app = express();
+
+// ── HTTP server + Socket.io ──────────────────────────────────────
+const httpServer = http.createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: (origin, cb) => {
+      if (!origin || origin.includes('vercel.app') || origin.includes('localhost')) cb(null, true)
+      else cb(new Error('Not allowed by CORS'))
+    },
+    credentials: true,
+  },
+  transports: ['websocket', 'polling'],
+});
 
 // ── CORS ────────────────────────────────────────────────────────
 app.use(cors({
@@ -87,6 +103,14 @@ app.use(async (req, res, next) => {
 // ── Health check ─────────────────────────────────────────────────
 app.get('/', (req, res) => res.json({ message: 'University E-Portal API running' }));
 
+// ── Start cron jobs (production — Heroku/Render keeps process alive) ──
+if (process.env.NODE_ENV === 'production') {
+  connectDB().then(() => {
+    const { startSubscriptionReminderCron } = require('./cron/subscriptionReminder');
+    startSubscriptionReminderCron();
+  }).catch(() => {});
+}
+
 // ── Debug env (remove after fixing) ─────────────────────────────
 app.get('/api/debug-env', (req, res) => {
   res.json({
@@ -115,12 +139,129 @@ app.use('/api/contact',             require('./routes/contact.routes'))
 app.use('/api/leads',               require('./routes/lead.routes'))
 app.use('/api/team-members',        require('./routes/teamMember.routes'))
 app.use('/api/meetings',            require('./routes/meeting.routes'))
+app.use('/api/chat',                require('./routes/chat.routes'))
+app.use('/api/finance',            require('./routes/finance.routes'))
+app.use('/api/products',           require('./routes/product.routes'))
+app.use('/api/clients',            require('./routes/client.routes'))
+app.use('/api/subscriptions',      require('./routes/subscription.routes'))
+app.use('/api/attendance',         require('./routes/attendance.routes'))
+
+// ── Socket.io — real-time chat ────────────────────────────────────
+const ChatMessage = require('./models/ChatMessage.model')
+const ChatRoom    = require('./models/ChatRoom.model')
+const { makeRoomId } = require('./routes/chat.routes')
+
+// Socket auth middleware — verifies JWT before allowing connection
+io.use((socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token || socket.handshake.query?.token
+    if (!token) return next(new Error('Authentication required'))
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    socket.user = decoded   // { id, name, role, email, ... }
+    next()
+  } catch {
+    next(new Error('Invalid token'))
+  }
+})
+
+// Map userId → Set of socketIds (one user can have multiple tabs open)
+const onlineUsers = new Map()
+
+io.on('connection', (socket) => {
+  const userId = socket.user.id.toString()
+  if (!onlineUsers.has(userId)) onlineUsers.set(userId, new Set())
+  onlineUsers.get(userId).add(socket.id)
+
+  // Broadcast updated online list to everyone
+  io.emit('online_users', [...onlineUsers.keys()])
+
+  // ── Join a chat room ──────────────────────────────────────────
+  socket.on('join_room', (roomId) => {
+    socket.join(roomId)
+  })
+
+  // ── Send a message ────────────────────────────────────────────
+  socket.on('send_message', async (data) => {
+    try {
+      const { toUserId, text, fileUrl, fileName } = data
+      const roomId = makeRoomId(userId, toUserId)
+
+      // Persist to DB
+      const msg = await ChatMessage.create({
+        roomId,
+        senderId:   socket.user.id,
+        senderName: socket.user.name,
+        senderRole: socket.user.role,
+        text:       text || '',
+        fileUrl:    fileUrl || '',
+        fileName:   fileName || '',
+        readBy:     [socket.user.id],
+      })
+
+      // Update / create ChatRoom metadata
+      await ChatRoom.findOneAndUpdate(
+        { roomId },
+        {
+          $set: {
+            participants:  [socket.user.id, toUserId],
+            lastMessage:   text ? (text.length > 80 ? text.slice(0, 80) + '…' : text) : '📎 Attachment',
+            lastSenderId:  socket.user.id,
+            lastAt:        new Date(),
+          },
+          $inc: { [`unreadCounts.${toUserId}`]: 1 },
+        },
+        { upsert: true, new: true }
+      )
+
+      // Emit to everyone in the room (sender + receiver)
+      io.to(roomId).emit('new_message', msg)
+
+      // If receiver is NOT in the room socket, emit a "chat_notification" event to them directly
+      const receiverSockets = onlineUsers.get(toUserId.toString())
+      if (receiverSockets) {
+        receiverSockets.forEach(sid => {
+          const receiverSocket = io.sockets.sockets.get(sid)
+          if (receiverSocket && !receiverSocket.rooms.has(roomId)) {
+            receiverSocket.emit('chat_notification', {
+              from: socket.user.name,
+              roomId,
+              preview: text ? text.slice(0, 60) : '📎 Attachment',
+            })
+          }
+        })
+      }
+    } catch (err) {
+      socket.emit('error', { message: err.message })
+    }
+  })
+
+  // ── Typing indicator ──────────────────────────────────────────
+  socket.on('typing', ({ toUserId, isTyping }) => {
+    const roomId = makeRoomId(userId, toUserId)
+    socket.to(roomId).emit('typing', { fromUserId: userId, isTyping })
+  })
+
+  // ── Disconnect ────────────────────────────────────────────────
+  socket.on('disconnect', () => {
+    const sockets = onlineUsers.get(userId)
+    if (sockets) {
+      sockets.delete(socket.id)
+      if (sockets.size === 0) onlineUsers.delete(userId)
+    }
+    io.emit('online_users', [...onlineUsers.keys()])
+  })
+})
 
 // ── Local dev server ─────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 5000;
   connectDB().then(() => {
-    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+    httpServer.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      // Start cron jobs after DB is connected
+      const { startSubscriptionReminderCron } = require('./cron/subscriptionReminder');
+      startSubscriptionReminderCron();
+    });
   }).catch((err) => console.error('❌ MongoDB error:', err));
 }
 

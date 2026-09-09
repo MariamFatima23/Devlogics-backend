@@ -64,11 +64,12 @@ const update = async (req, res) => {
       const hashedPw = await bcrypt.hash(password, 10)
       await User.findByIdAndUpdate(member.userId, { password: hashedPw })
     }
-    // Sync name/email/phone to User
+    // Sync name/email/phone and financeAccess to User
     if (member.userId) {
       const syncData = {}
-      if (rest.name)  syncData.name  = rest.name
-      if (rest.phone) syncData.phone = rest.phone
+      if (rest.name  !== undefined) syncData.name  = rest.name
+      if (rest.phone !== undefined) syncData.phone = rest.phone
+      if (rest.financeAccess !== undefined) syncData.financeAccess = rest.financeAccess
       if (Object.keys(syncData).length) await User.findByIdAndUpdate(member.userId, syncData)
     }
 

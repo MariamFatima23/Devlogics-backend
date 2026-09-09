@@ -29,4 +29,18 @@ const crmAccess = (req, res, next) => {
   next();
 };
 
-module.exports = { protect, adminOnly, crmAccess };
+// Admin OR team_member with financeAccess can access finance routes
+const financeOrAdmin = (req, res, next) => {
+  if (req.user?.role === 'admin') return next();
+  if (req.user?.role === 'team_member' && req.user?.financeAccess === true) return next();
+  return res.status(403).json({ message: 'Finance access required' });
+};
+
+// Admin OR product_manager can access product portal routes
+const productAccess = (req, res, next) => {
+  if (req.user?.role === 'admin') return next();
+  if (req.user?.role === 'product_manager') return next();
+  return res.status(403).json({ message: 'Product portal access required' });
+};
+
+module.exports = { protect, adminOnly, crmAccess, financeOrAdmin, productAccess };
