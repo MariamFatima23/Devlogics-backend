@@ -79,6 +79,26 @@ const siteSettingsSchema = new mongoose.Schema({
   // ── Footer
   footerTagline: { type: String, default: 'Course & Service Management' },
 
+  // ── Student Portal Feature Controls (Lead Portal - /student-portal) ──
+  studentPortalFeatures: {
+    showAttendance:   { type: Boolean, default: true  },
+    showProfile:      { type: Boolean, default: true  },
+    showSubscription: { type: Boolean, default: true  },
+    showBilling:      { type: Boolean, default: true  },
+    showSupport:      { type: Boolean, default: true  },
+  },
+
+  // ── Student Dashboard Controls (/dashboard for role=student) ────
+  studentDashboardFeatures: {
+    showAttendance:    { type: Boolean, default: true  },
+    showProfile:       { type: Boolean, default: true  },
+    showCourses:       { type: Boolean, default: false },
+    showApplications:  { type: Boolean, default: false },
+    showAnnouncements: { type: Boolean, default: false },
+    showAddReview:     { type: Boolean, default: false },
+    showChat:          { type: Boolean, default: false },
+  },
+
   // ── Theme Colors
   theme: {
     primary:     { type: String, default: '#04065c' },   // navbar, sidebar, buttons
